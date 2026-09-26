@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+functions/venv/
+functions/__pycache__/
+.firebase/
+demo-data/
+
+/ios/
+/linux/
+/macos/
+/windows/
