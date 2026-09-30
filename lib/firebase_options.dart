@@ -28,15 +28,9 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -63,6 +57,25 @@ class DefaultFirebaseOptions {
     appId: '1:486976040470:android:0d90d757921d7a97060f37',
     messagingSenderId: '486976040470',
     projectId: 'prog4swsys',
+    storageBucket: 'prog4swsys.firebasestorage.app',
+  );
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyBJsfVpo_wqjeb2MJdVmSqoQ3YkvCGYwYg',
+    appId: '1:486976040470:ios:9edcecd785b96c14060f37',
+    messagingSenderId: '486976040470',
+    projectId: 'prog4swsys',
+    storageBucket: 'prog4swsys.firebasestorage.app',
+    androidClientId: '486976040470-4qcmr3tu48g43jjpbfaij07jjb969ff2.apps.googleusercontent.com',
+    iosClientId: '486976040470-f9ki1kcu1k352rii1kobjb2hlmkc2c5k.apps.googleusercontent.com',
+    iosBundleId: 'com.example.proj4swsys',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDHXSOK0nmMqcPyyxv8JmCAmYIUs0SZhP8',
+    appId: '1:486976040470:web:21bf6c65e4d736b4060f37',
+    messagingSenderId: '486976040470',
+    projectId: 'prog4swsys',
+    authDomain: 'prog4swsys.firebaseapp.com',
     storageBucket: 'prog4swsys.firebasestorage.app',
   );
 }
