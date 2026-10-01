@@ -2,10 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:proj4swsys/main.dart';
 import 'package:proj4swsys/screens/auth_gate.dart';
 import 'package:proj4swsys/services/firebase_emulators.dart';
 
 void main() {
+  test('task repository uses the rules-scoped shared board', () {
+    expect(TaskRepository.boardId, 'shared');
+  });
+
   testWidgets('shows loading until authentication state is available', (
     tester,
   ) async {

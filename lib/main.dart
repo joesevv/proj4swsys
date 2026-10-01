@@ -78,11 +78,14 @@ class TaskItem {
 // Firestore access
 // ---------------------------------------------------------------------------
 
-/// All reads and writes for tasks go through here, stored in a top-level
-/// Firestore collection called 'tasks'.
+/// All task access goes through the shared board's Firestore subcollection.
 class TaskRepository {
+  static const String boardId = 'shared';
+
   final CollectionReference<Map<String, dynamic>> _tasks = FirebaseFirestore
       .instance
+      .collection('boards')
+      .doc(boardId)
       .collection('tasks');
 
   Stream<List<TaskItem>> watchTasks() {
