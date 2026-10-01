@@ -27,7 +27,26 @@ class TaskBoardApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TaskBoard',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF55D6AE),
+          brightness: Brightness.dark,
+          surface: const Color(0xFF202428),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF171A1D),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF171A1D),
+          foregroundColor: Color(0xFFF2F5F4),
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF2B3035),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        ),
+      ),
       home: AuthGate(
         authState: () => authService.authState,
         onSignIn: authService.signInWithGoogle,
@@ -44,9 +63,9 @@ class TaskBoardApp extends StatelessWidget {
 /// The columns on the board. The enum name ('todo', 'doing', 'done') is what
 /// gets stored in Firestore, and the label is what's shown on screen.
 enum TaskStatus {
-  todo('To do'),
-  doing('In progress'),
-  done('Done');
+  todo('To Do'),
+  doing('In Progress'),
+  done('Finished');
 
   const TaskStatus(this.label);
   final String label;
@@ -209,25 +228,41 @@ class _BoardScreenState extends State<BoardScreen> {
           }
 
           final tasks = snapshot.data!;
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final status in TaskStatus.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: _BoardColumn(
-                      status: status,
-                      tasks: tasks.where((t) => t.status == status).toList(),
-                      onMove: (task, newStatus) =>
-                          _run(() => _repo.moveTask(task.id, newStatus)),
-                      onDelete: (task) => _run(() => _repo.deleteTask(task.id)),
-                    ),
-                  ),
-              ],
-            ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              const horizontalPadding = 12.0;
+              const columnSpacing = 12.0;
+              final availableWidth =
+                  constraints.maxWidth - horizontalPadding * 2;
+              final columnWidth = availableWidth >= 3 * 280 + 2 * columnSpacing
+                  ? (availableWidth - 2 * columnSpacing) / 3
+                  : (availableWidth - columnSpacing).clamp(280.0, 560.0);
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(horizontalPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final status in TaskStatus.values)
+                      Padding(
+                        padding: const EdgeInsets.only(right: columnSpacing),
+                        child: _BoardColumn(
+                          status: status,
+                          width: columnWidth,
+                          tasks: tasks
+                              .where((t) => t.status == status)
+                              .toList(),
+                          onMove: (task, newStatus) =>
+                              _run(() => _repo.moveTask(task.id, newStatus)),
+                          onDelete: (task) =>
+                              _run(() => _repo.deleteTask(task.id)),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
@@ -242,17 +277,17 @@ class _BoardScreenState extends State<BoardScreen> {
 class _BoardColumn extends StatelessWidget {
   const _BoardColumn({
     required this.status,
+    required this.width,
     required this.tasks,
     required this.onMove,
     required this.onDelete,
   });
 
   final TaskStatus status;
+  final double width;
   final List<TaskItem> tasks;
   final void Function(TaskItem task, TaskStatus newStatus) onMove;
   final void Function(TaskItem task) onDelete;
-
-  static const double width = 280;
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +330,7 @@ class _BoardColumn extends StatelessWidget {
                 child: tasks.isEmpty
                     ? Center(
                         child: Text(
-                          'Drag tasks here',
+                          _emptyMessage,
                           style: TextStyle(color: colors.onSurfaceVariant),
                         ),
                       )
@@ -308,6 +343,7 @@ class _BoardColumn extends StatelessWidget {
                           final task = tasks[index];
                           return _TaskCard(
                             task: task,
+                            columnWidth: width,
                             onMove: (newStatus) => onMove(task, newStatus),
                             onDelete: () => onDelete(task),
                           );
@@ -320,6 +356,12 @@ class _BoardColumn extends StatelessWidget {
       },
     );
   }
+
+  String get _emptyMessage => switch (status) {
+    TaskStatus.todo => 'No tasks yet',
+    TaskStatus.doing => 'Nothing in progress',
+    TaskStatus.done => 'Nothing finished',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -329,11 +371,13 @@ class _BoardColumn extends StatelessWidget {
 class _TaskCard extends StatelessWidget {
   const _TaskCard({
     required this.task,
+    required this.columnWidth,
     required this.onMove,
     required this.onDelete,
   });
 
   final TaskItem task;
+  final double columnWidth;
   final void Function(TaskStatus newStatus) onMove;
   final VoidCallback onDelete;
 
@@ -367,7 +411,7 @@ class _TaskCard extends StatelessWidget {
         elevation: 6,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          width: _BoardColumn.width - 16,
+          width: columnWidth - 16,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Text(task.title),
