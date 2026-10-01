@@ -5,10 +5,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+ ///google sign in once per run
   static bool _googleStarted = false;
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authState => _auth.authStateChanges();
+
+  ///display name for tasks , fallback is gmail  addr
+  String get currentName => currentUser?.displayName ?? currentUser?.email ?? 'Unknown';
 
   Future<void> _startGoogle() async {
     if (!_googleStarted) {
@@ -17,8 +21,7 @@ class AuthService {
     }
   }
 
-  // Signs in with Google.
-  // Throws a short message if something goes wrong.
+  ///throws error msg if picker closed
   Future<void> signInWithGoogle() async {
     try {
       if (kIsWeb) {
@@ -43,7 +46,7 @@ class AuthService {
     }
   }
 
-  // Signs out of Firebase and Google
+  ///sign out of google and firebase so acc picker shows next time
   Future<void> signOut() async {
     await _auth.signOut();
     if (!kIsWeb) {

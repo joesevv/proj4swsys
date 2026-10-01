@@ -2,18 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:proj4swsys/main.dart';
 import 'package:proj4swsys/screens/auth_gate.dart';
 import 'package:proj4swsys/services/firebase_emulators.dart';
+import 'package:proj4swsys/services/write_service.dart';
 
 void main() {
-  test('task repository uses the rules-scoped shared board', () {
-    expect(TaskRepository.boardId, 'shared');
+  test('join codes are six characters from the easy-to-read alphabet', () {
+    for (var i = 0; i < 100; i++) {
+      final code = WriteService.newCode();
+      expect(code.length, WriteService.codeLength);
+      expect(code.split('').every(WriteService.codeAlphabet.contains), isTrue);
+    }
   });
 
   testWidgets('shows loading until authentication state is available', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     final auth = StreamController<Object?>();
     addTearDown(auth.close);
 
