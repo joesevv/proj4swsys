@@ -1,24 +1,97 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function validNewTask() {
-      return request.resource.data.keys().hasOnly(['title', 'status', 'createdAt'])
-        && request.resource.data.keys().hasAll(['title', 'status', 'createdAt'])
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 200
-        && request.resource.data.status == 'todo'
-        && request.resource.data.createdAt == request.time;
+
+    function signedIn() {
+      return request.auth != null;
     }
+
+    function isMember(boardId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.members;
+    }
+
+    // A {uid, name} stamp, nothing more, with a sane name length.
+    function validPerson(p) {
+      return p.keys().hasOnly(['uid', 'name'])
+        && p.uid is string
+        && p.name is string
+        && p.name.size() > 0
+        && p.name.size() <= 100;
+    }
+
+    // What a task must look like the moment it is created.
+    function validNewTask() {
+      let t = request.resource.data;
+      return t.keys().hasOnly(['title', 'status', 'createdBy', 'createdAt', 'startedBy', 'startedAt', 'doneAt'])
+        && t.keys().hasAll(['title', 'status', 'createdBy', 'createdAt', 'startedBy', 'startedAt', 'doneAt'])
+        && t.title is string
+        && t.title.size() > 0
+        && t.title.size() <= 200
+        && t.status == 'todo'
+        && validPerson(t.createdBy)
+        && t.createdBy.uid == request.auth.uid
+        && t.createdAt == request.time
+        && t.startedBy == null
+        && t.startedAt == null
+        && t.doneAt == null;
+    }
+
+    // todo -> inprogress, by any member, stamping who started it.
+    // Because the task must still be 'todo', two people pressing Start at the
+    // same time cannot both succeed: the second one sees 'inprogress' and is refused.
+    function canStart() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return before.status == 'todo'
+        && after.diff(before).affectedKeys().hasOnly(['status', 'startedBy', 'startedAt'])
+        && after.status == 'inprogress'
+        && validPerson(after.startedBy)
+        && after.startedBy.uid == request.auth.uid
+        && after.startedAt == request.time;
+    }
+
+    // inprogress -> done, only by the person who started it.
+    function canFinish() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return before.status == 'inprogress'
+        && before.startedBy.uid == request.auth.uid
+        && after.diff(before).affectedKeys().hasOnly(['status', 'doneAt'])
+        && after.status == 'done'
+        && after.doneAt == request.time;
+    }
+
     match /boards/{boardId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.members;
-      allow write: if false;
+      // A board's id is its 6-character join code. Only members can read it.
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      // Creating a board: you are its only member and its creator.
+      allow create: if signedIn()
+        // Same alphabet the app uses: no 0, O, 1, I or L.
+        && boardId.matches('^[A-HJKMNP-Z2-9]{6}$')
+        && request.resource.data.keys().hasOnly(['name', 'code', 'members', 'createdBy', 'createdAt'])
+        && request.resource.data.keys().hasAll(['name', 'code', 'members', 'createdBy', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 50
+        && request.resource.data.code == boardId
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      // Joining: the only change allowed is adding your own uid to the end of members.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+        && request.resource.data.members == resource.data.members.concat([request.auth.uid]);
+
+      allow delete: if false;
+
       match /tasks/{taskId} {
-        allow read: if boardId == 'shared' && request.auth != null;
-        allow create: if boardId == 'shared'
-          && request.auth != null
-          && validNewTask();
-        allow update, delete: if false;
+        allow read: if isMember(boardId);
+        allow create: if isMember(boardId) && validNewTask();
+        allow update: if isMember(boardId) && (canStart() || canFinish());
+        allow delete: if false;
       }
     }
   }
