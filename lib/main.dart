@@ -1,37 +1,57 @@
 import 'package:flutter/material.dart';
-///adding firebase imports and connection for services
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 
 import 'firebase_options.dart';
+import 'screens/auth_gate.dart';
+import 'services/auth_service.dart';
+import 'services/firebase_emulators.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  if (kDebugMode) {
-    // The Android emulator reaches the host machine at 10.0.2.2; web/desktop use localhost.
-    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android ? '10.0.2.2' : 'localhost';
-    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-    FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+  if (const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
+    await connectFirebaseEmulators();
   }
 
-  runApp(const TaskBoardApp());
+  runApp(TaskBoardApp(authService: AuthService()));
 }
 
 class TaskBoardApp extends StatelessWidget {
-  const TaskBoardApp({super.key});
+  const TaskBoardApp({super.key, required this.authService});
+
+  final AuthService authService;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TaskBoard',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo),
-      home: const BoardScreen(),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF55D6AE),
+          brightness: Brightness.dark,
+          surface: const Color(0xFF202428),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF171A1D),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF171A1D),
+          foregroundColor: Color(0xFFF2F5F4),
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF2B3035),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        ),
+      ),
+      home: AuthGate(
+        authState: () => authService.authState,
+        onSignIn: authService.signInWithGoogle,
+        signedInBuilder: (_) => BoardScreen(onSignOut: authService.signOut),
+      ),
     );
   }
 }
@@ -43,15 +63,15 @@ class TaskBoardApp extends StatelessWidget {
 /// The columns on the board. The enum name ('todo', 'doing', 'done') is what
 /// gets stored in Firestore, and the label is what's shown on screen.
 enum TaskStatus {
-  todo('To do'),
-  doing('In progress'),
-  done('Done');
+  todo('To Do'),
+  doing('In Progress'),
+  done('Finished');
 
   const TaskStatus(this.label);
   final String label;
 
   static TaskStatus fromName(String? name) => TaskStatus.values.firstWhere(
-        (s) => s.name == name,
+    (s) => s.name == name,
     orElse: () => TaskStatus.todo,
   );
 }
@@ -77,11 +97,15 @@ class TaskItem {
 // Firestore access
 // ---------------------------------------------------------------------------
 
-/// All reads and writes for tasks go through here, stored in a top-level
-/// Firestore collection called 'tasks'.
+/// All task access goes through the shared board's Firestore subcollection.
 class TaskRepository {
-  final CollectionReference<Map<String, dynamic>> _tasks =
-  FirebaseFirestore.instance.collection('tasks');
+  static const String boardId = 'shared';
+
+  final CollectionReference<Map<String, dynamic>> _tasks = FirebaseFirestore
+      .instance
+      .collection('boards')
+      .doc(boardId)
+      .collection('tasks');
 
   Stream<List<TaskItem>> watchTasks() {
     return _tasks
@@ -112,7 +136,9 @@ class TaskRepository {
 // ---------------------------------------------------------------------------
 
 class BoardScreen extends StatefulWidget {
-  const BoardScreen({super.key});
+  const BoardScreen({super.key, required this.onSignOut});
+
+  final Future<void> Function() onSignOut;
 
   @override
   State<BoardScreen> createState() => _BoardScreenState();
@@ -121,6 +147,22 @@ class BoardScreen extends StatefulWidget {
 class _BoardScreenState extends State<BoardScreen> {
   final TaskRepository _repo = TaskRepository();
   late final Stream<List<TaskItem>> _tasksStream = _repo.watchTasks();
+  bool _signingOut = false;
+
+  Future<void> _signOut() async {
+    setState(() => _signingOut = true);
+    try {
+      await widget.onSignOut();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
 
   /// Runs a Firestore write and shows a message if it fails
   /// (for example, if security rules reject it).
@@ -129,9 +171,8 @@ class _BoardScreenState extends State<BoardScreen> {
       await action();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Something went wrong: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Something went wrong: $e')));
     }
   }
 
@@ -147,7 +188,22 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TaskBoard')),
+      appBar: AppBar(
+        title: const Text('TaskBoard'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: _signingOut ? null : _signOut,
+            icon: _signingOut
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addTask,
         icon: const Icon(Icons.add),
@@ -172,25 +228,41 @@ class _BoardScreenState extends State<BoardScreen> {
           }
 
           final tasks = snapshot.data!;
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final status in TaskStatus.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: _BoardColumn(
-                      status: status,
-                      tasks: tasks.where((t) => t.status == status).toList(),
-                      onMove: (task, newStatus) =>
-                          _run(() => _repo.moveTask(task.id, newStatus)),
-                      onDelete: (task) => _run(() => _repo.deleteTask(task.id)),
-                    ),
-                  ),
-              ],
-            ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              const horizontalPadding = 12.0;
+              const columnSpacing = 12.0;
+              final availableWidth =
+                  constraints.maxWidth - horizontalPadding * 2;
+              final columnWidth = availableWidth >= 3 * 280 + 2 * columnSpacing
+                  ? (availableWidth - 2 * columnSpacing) / 3
+                  : (availableWidth - columnSpacing).clamp(280.0, 560.0);
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(horizontalPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final status in TaskStatus.values)
+                      Padding(
+                        padding: const EdgeInsets.only(right: columnSpacing),
+                        child: _BoardColumn(
+                          status: status,
+                          width: columnWidth,
+                          tasks: tasks
+                              .where((t) => t.status == status)
+                              .toList(),
+                          onMove: (task, newStatus) =>
+                              _run(() => _repo.moveTask(task.id, newStatus)),
+                          onDelete: (task) =>
+                              _run(() => _repo.deleteTask(task.id)),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
@@ -205,17 +277,17 @@ class _BoardScreenState extends State<BoardScreen> {
 class _BoardColumn extends StatelessWidget {
   const _BoardColumn({
     required this.status,
+    required this.width,
     required this.tasks,
     required this.onMove,
     required this.onDelete,
   });
 
   final TaskStatus status;
+  final double width;
   final List<TaskItem> tasks;
   final void Function(TaskItem task, TaskStatus newStatus) onMove;
   final void Function(TaskItem task) onDelete;
-
-  static const double width = 280;
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +303,9 @@ class _BoardColumn extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           width: width,
           decoration: BoxDecoration(
-            color: isHovered ? colors.primaryContainer : colors.surfaceContainerHighest,
+            color: isHovered
+                ? colors.primaryContainer
+                : colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -240,34 +314,41 @@ class _BoardColumn extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(
                   children: [
-                    Text(status.label, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      status.label,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const Spacer(),
-                    Text('${tasks.length}', style: Theme.of(context).textTheme.labelLarge),
+                    Text(
+                      '${tasks.length}',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
                   ],
                 ),
               ),
               Expanded(
                 child: tasks.isEmpty
                     ? Center(
-                  child: Text(
-                    'Drag tasks here',
-                    style: TextStyle(color: colors.onSurfaceVariant),
-                  ),
-                )
+                        child: Text(
+                          _emptyMessage,
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                      )
                     : ListView.builder(
-                  // Extra bottom padding so the "Add task" button
-                  // doesn't cover the last card.
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 88),
-                  itemCount: tasks.length,
-                  itemBuilder: (context, index) {
-                    final task = tasks[index];
-                    return _TaskCard(
-                      task: task,
-                      onMove: (newStatus) => onMove(task, newStatus),
-                      onDelete: () => onDelete(task),
-                    );
-                  },
-                ),
+                        // Extra bottom padding so the "Add task" button
+                        // doesn't cover the last card.
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 88),
+                        itemCount: tasks.length,
+                        itemBuilder: (context, index) {
+                          final task = tasks[index];
+                          return _TaskCard(
+                            task: task,
+                            columnWidth: width,
+                            onMove: (newStatus) => onMove(task, newStatus),
+                            onDelete: () => onDelete(task),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -275,6 +356,12 @@ class _BoardColumn extends StatelessWidget {
       },
     );
   }
+
+  String get _emptyMessage => switch (status) {
+    TaskStatus.todo => 'No tasks yet',
+    TaskStatus.doing => 'Nothing in progress',
+    TaskStatus.done => 'Nothing finished',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -282,9 +369,15 @@ class _BoardColumn extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task, required this.onMove, required this.onDelete});
+  const _TaskCard({
+    required this.task,
+    required this.columnWidth,
+    required this.onMove,
+    required this.onDelete,
+  });
 
   final TaskItem task;
+  final double columnWidth;
   final void Function(TaskStatus newStatus) onMove;
   final VoidCallback onDelete;
 
@@ -305,10 +398,7 @@ class _TaskCard extends StatelessWidget {
                   child: Text('Move to ${status.label}'),
                 ),
             const PopupMenuDivider(),
-            PopupMenuItem(
-              value: onDelete,
-              child: const Text('Delete'),
-            ),
+            PopupMenuItem(value: onDelete, child: const Text('Delete')),
           ],
         ),
       ),
@@ -321,7 +411,7 @@ class _TaskCard extends StatelessWidget {
         elevation: 6,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          width: _BoardColumn.width - 16,
+          width: columnWidth - 16,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Text(task.title),
