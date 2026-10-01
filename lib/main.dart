@@ -1,37 +1,38 @@
 import 'package:flutter/material.dart';
-///adding firebase imports and connection for services
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 
 import 'firebase_options.dart';
+import 'screens/auth_gate.dart';
+import 'services/auth_service.dart';
+import 'services/firebase_emulators.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  if (kDebugMode) {
-    // The Android emulator reaches the host machine at 10.0.2.2; web/desktop use localhost.
-    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android ? '10.0.2.2' : 'localhost';
-    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-    FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+  if (const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
+    await connectFirebaseEmulators();
   }
 
-  runApp(const TaskBoardApp());
+  runApp(TaskBoardApp(authService: AuthService()));
 }
 
 class TaskBoardApp extends StatelessWidget {
-  const TaskBoardApp({super.key});
+  const TaskBoardApp({super.key, required this.authService});
+
+  final AuthService authService;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TaskBoard',
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
-      home: const BoardScreen(),
+      home: AuthGate(
+        authState: () => authService.authState,
+        onSignIn: authService.signInWithGoogle,
+        signedInBuilder: (_) => BoardScreen(onSignOut: authService.signOut),
+      ),
     );
   }
 }
@@ -51,7 +52,7 @@ enum TaskStatus {
   final String label;
 
   static TaskStatus fromName(String? name) => TaskStatus.values.firstWhere(
-        (s) => s.name == name,
+    (s) => s.name == name,
     orElse: () => TaskStatus.todo,
   );
 }
@@ -80,8 +81,9 @@ class TaskItem {
 /// All reads and writes for tasks go through here, stored in a top-level
 /// Firestore collection called 'tasks'.
 class TaskRepository {
-  final CollectionReference<Map<String, dynamic>> _tasks =
-  FirebaseFirestore.instance.collection('tasks');
+  final CollectionReference<Map<String, dynamic>> _tasks = FirebaseFirestore
+      .instance
+      .collection('tasks');
 
   Stream<List<TaskItem>> watchTasks() {
     return _tasks
@@ -112,7 +114,9 @@ class TaskRepository {
 // ---------------------------------------------------------------------------
 
 class BoardScreen extends StatefulWidget {
-  const BoardScreen({super.key});
+  const BoardScreen({super.key, required this.onSignOut});
+
+  final Future<void> Function() onSignOut;
 
   @override
   State<BoardScreen> createState() => _BoardScreenState();
@@ -121,6 +125,22 @@ class BoardScreen extends StatefulWidget {
 class _BoardScreenState extends State<BoardScreen> {
   final TaskRepository _repo = TaskRepository();
   late final Stream<List<TaskItem>> _tasksStream = _repo.watchTasks();
+  bool _signingOut = false;
+
+  Future<void> _signOut() async {
+    setState(() => _signingOut = true);
+    try {
+      await widget.onSignOut();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
 
   /// Runs a Firestore write and shows a message if it fails
   /// (for example, if security rules reject it).
@@ -129,9 +149,8 @@ class _BoardScreenState extends State<BoardScreen> {
       await action();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Something went wrong: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Something went wrong: $e')));
     }
   }
 
@@ -147,7 +166,22 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('TaskBoard')),
+      appBar: AppBar(
+        title: const Text('TaskBoard'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: _signingOut ? null : _signOut,
+            icon: _signingOut
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addTask,
         icon: const Icon(Icons.add),
@@ -231,7 +265,9 @@ class _BoardColumn extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           width: width,
           decoration: BoxDecoration(
-            color: isHovered ? colors.primaryContainer : colors.surfaceContainerHighest,
+            color: isHovered
+                ? colors.primaryContainer
+                : colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -240,34 +276,40 @@ class _BoardColumn extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(
                   children: [
-                    Text(status.label, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      status.label,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const Spacer(),
-                    Text('${tasks.length}', style: Theme.of(context).textTheme.labelLarge),
+                    Text(
+                      '${tasks.length}',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
                   ],
                 ),
               ),
               Expanded(
                 child: tasks.isEmpty
                     ? Center(
-                  child: Text(
-                    'Drag tasks here',
-                    style: TextStyle(color: colors.onSurfaceVariant),
-                  ),
-                )
+                        child: Text(
+                          'Drag tasks here',
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                      )
                     : ListView.builder(
-                  // Extra bottom padding so the "Add task" button
-                  // doesn't cover the last card.
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 88),
-                  itemCount: tasks.length,
-                  itemBuilder: (context, index) {
-                    final task = tasks[index];
-                    return _TaskCard(
-                      task: task,
-                      onMove: (newStatus) => onMove(task, newStatus),
-                      onDelete: () => onDelete(task),
-                    );
-                  },
-                ),
+                        // Extra bottom padding so the "Add task" button
+                        // doesn't cover the last card.
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 88),
+                        itemCount: tasks.length,
+                        itemBuilder: (context, index) {
+                          final task = tasks[index];
+                          return _TaskCard(
+                            task: task,
+                            onMove: (newStatus) => onMove(task, newStatus),
+                            onDelete: () => onDelete(task),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -282,7 +324,11 @@ class _BoardColumn extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task, required this.onMove, required this.onDelete});
+  const _TaskCard({
+    required this.task,
+    required this.onMove,
+    required this.onDelete,
+  });
 
   final TaskItem task;
   final void Function(TaskStatus newStatus) onMove;
@@ -305,10 +351,7 @@ class _TaskCard extends StatelessWidget {
                   child: Text('Move to ${status.label}'),
                 ),
             const PopupMenuDivider(),
-            PopupMenuItem(
-              value: onDelete,
-              child: const Text('Delete'),
-            ),
+            PopupMenuItem(value: onDelete, child: const Text('Delete')),
           ],
         ),
       ),

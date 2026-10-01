@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, required this.onSignIn});
+
+  final Future<void> Function() onSignIn;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _auth = AuthService();
   bool _loading = false;
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _signIn() async {
     setState(() => _loading = true);
     try {
-      await _auth.signInWithGoogle();
+      await widget.onSignIn();
     } catch (e) {
       _snack('$e');
     } finally {
@@ -37,7 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('TaskBoard', style: Theme.of(context).textTheme.displaySmall),
+              Text(
+                'TaskBoard',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
               const SizedBox(height: 8),
               const Text('A small shared board: To Do, In Progress, Done.'),
               const SizedBox(height: 32),
