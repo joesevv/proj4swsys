@@ -12,7 +12,10 @@ class TaskCard extends StatelessWidget {
   final Task task;
   final WriteService writer;
 
-  Future<void> _run(BuildContext context, Future<void> Function() action) async {
+  Future<void> _run(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
     /// if another member's change moves this card first, the card is gone by the time the error arrives, but the message must still show.
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -33,22 +36,64 @@ class TaskCard extends StatelessWidget {
     Widget? button;
     if (task.status == TaskStatus.todo) {
       button = FilledButton.tonal(
-        onPressed: () => _run(context, () => writer.startTask(task.boardId, task.id)),
+        onPressed: () =>
+            _run(context, () => writer.startTask(task.boardId, task.id)),
         child: const Text('Start'),
       );
-    } else if (task.status == TaskStatus.inprogress && task.startedByUid == writer.uid) {
+    } else if (task.status == TaskStatus.inprogress &&
+        task.startedByUid == writer.uid) {
       button = FilledButton(
-        onPressed: () => _run(context, () => writer.finishTask(task.boardId, task.id)),
+        onPressed: () =>
+            _run(context, () => writer.finishTask(task.boardId, task.id)),
         child: const Text('Done'),
       );
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        title: Text(task.title),
-        subtitle: Text(subtitle),
-        trailing: button,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFF34394D)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task.title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline_rounded,
+                  size: 16,
+                  color: Color(0xFFAAAFC5),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFAAAFC5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (button != null) ...[
+              const SizedBox(height: 14),
+              Align(alignment: Alignment.centerRight, child: button),
+            ],
+          ],
+        ),
       ),
     );
   }

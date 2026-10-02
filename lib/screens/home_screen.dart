@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../models/board.dart';
 import '../services/auth_service.dart';
 import '../services/board_service.dart';
@@ -31,13 +32,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _openBoard(Board board) {
     Navigator.push(
       context,
-      MaterialPageRoute<void>(builder: (_) => BoardScreen(board: board, auth: widget.auth)),
+      MaterialPageRoute<void>(
+        builder: (_) => BoardScreen(board: board, auth: widget.auth),
+      ),
     );
   }
 
@@ -58,13 +62,21 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: controller,
           autofocus: true,
           maxLength: maxLength,
-          textCapitalization: uppercase ? TextCapitalization.characters : TextCapitalization.sentences,
+          textCapitalization: uppercase
+              ? TextCapitalization.characters
+              : TextCapitalization.sentences,
           decoration: InputDecoration(labelText: label),
           onSubmitted: (_) => Navigator.pop(ctx, controller.text),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: Text(action)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(action),
+          ),
         ],
       ),
     );
@@ -73,11 +85,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createBoard() async {
-    final name = await _askText(title: 'Create board', label: 'Board name', action: 'Create', maxLength: 50);
+    final name = await _askText(
+      title: 'Create board',
+      label: 'Board name',
+      action: 'Create',
+      maxLength: 50,
+    );
     if (name == null) return;
     try {
       final code = await _writer.createBoard(name);
-      final board = Board(id: code, name: name, members: [_uid], createdBy: _uid);
+      final board = Board(
+        id: code,
+        name: name,
+        members: [_uid],
+        createdBy: _uid,
+      );
       if (mounted) await _showCode(board);
     } catch (e) {
       _snack('$e');
@@ -95,7 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 12),
           SelectableText(
             board.code,
-            style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(letterSpacing: 4),
+            style: Theme.of(ctx).textTheme.headlineMedium
+                ?.copyWith(letterSpacing: 4),
           ),
         ],
       ),
@@ -141,7 +164,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Boards'),
+        toolbarHeight: 80,
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.space_dashboard_rounded, color: Color(0xFFB7A0FF)),
+            SizedBox(width: 12),
+            Text('TaskBoard'),
+          ],
+        ),
         actions: [
           Center(
             child: Padding(
@@ -149,27 +180,87 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(widget.auth.currentName),
             ),
           ),
-          IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: widget.auth.signOut),
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: widget.auth.signOut,
+          ),
         ],
       ),
       body: StreamBuilder<List<Board>>(
         stream: _boards.myBoards(_uid),
         builder: (context, snap) {
-          if (snap.hasError) return Center(child: Text('Could not load boards: ${snap.error}'));
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) {
+            return Center(child: Text('Could not load boards: ${snap.error}'));
+          }
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final boards = snap.data!;
           if (boards.isEmpty) {
-            return const Center(child: Text('No boards yet. Create one or join with a code.'));
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.dashboard_customize_outlined,
+                      size: 64,
+                      color: Color(0xFFB7A0FF),
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Your next big thing starts here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Create a board for your team, or join one with a code.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFAAAFC5)),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           return ListView.builder(
+            padding: const EdgeInsets.all(24),
             itemCount: boards.length,
             itemBuilder: (context, i) {
               final board = boards[i];
-              return ListTile(
-                leading: const Icon(Icons.dashboard_outlined),
-                title: Text(board.name),
-                subtitle: Text('Code: ${board.code}'),
-                onTap: () => _openBoard(board),
+              return Card(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB7A0FF).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.dashboard_outlined,
+                      color: Color(0xFFB7A0FF),
+                    ),
+                  ),
+                  title: Text(board.name),
+                  subtitle: Text(
+                    '${board.members.length} members • Code: ${board.code}',
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Color(0xFFB7A0FF),
+                  ),
+                  onTap: () => _openBoard(board),
+                ),
               );
             },
           );

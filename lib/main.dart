@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+
 import 'firebase_options.dart';
 import 'screens/auth_gate.dart';
 import 'screens/home_screen.dart';
@@ -32,21 +33,37 @@ class TaskBoardApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF55D6AE),
+          seedColor: const Color(0xFFB7A0FF),
           brightness: Brightness.dark,
-          surface: const Color(0xFF202428),
+          surface: const Color(0xFF1D2030),
         ),
-        scaffoldBackgroundColor: const Color(0xFF171A1D),
+        scaffoldBackgroundColor: const Color(0xFF10121C),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF171A1D),
+          backgroundColor: Color(0xFF10121C),
           foregroundColor: Color(0xFFF2F5F4),
+          centerTitle: false,
+          elevation: 0,
         ),
         cardTheme: const CardThemeData(
-          color: Color(0xFF2B3035),
+          color: Color(0xFF242839),
           surfaceTintColor: Colors.transparent,
           elevation: 0,
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF242839),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ),
+
       /// routing is login whenn signed out, home when signed in , boards use navigator
       home: AuthGate(
         authState: () => authService.authState,

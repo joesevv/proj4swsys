@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/board.dart';
 import '../models/task.dart';
 import '../services/auth_service.dart';
@@ -27,13 +28,17 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   void initState() {
     super.initState();
-    _writer = WriteService(uid: widget.auth.currentUser!.uid, name: widget.auth.currentName);
+    _writer = WriteService(
+      uid: widget.auth.currentUser!.uid,
+      name: widget.auth.currentName,
+    );
     _tasks = _boards.tasks(widget.board.id);
   }
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _addTask() async {
@@ -54,18 +59,27 @@ class _BoardScreenState extends State<BoardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 80,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.board.name),
-            Text('Code: ${widget.board.code}', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              'Code: ${widget.board.code}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addTask,
-        icon: const Icon(Icons.add),
-        label: const Text('Add task'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 24),
+            child: FilledButton.icon(
+              onPressed: _addTask,
+              icon: const Icon(Icons.add),
+              label: const Text('Add task'),
+            ),
+          ),
+        ],
       ),
       body: StreamBuilder<List<Task>>(
         stream: _tasks,
@@ -74,41 +88,99 @@ class _BoardScreenState extends State<BoardScreen> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('Could not load tasks: ${snap.error}', textAlign: TextAlign.center),
+                child: Text(
+                  'Could not load tasks: ${snap.error}',
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final tasks = snap.data!;
 
           /// ostream, split three ways in Dart. On a wide screen the three columns , share the width, phone has own styling parameters as well
           return LayoutBuilder(
             builder: (context, constraints) {
-              const padding = 12.0;
-              const spacing = 12.0;
+              const padding = 24.0;
+              const spacing = 16.0;
               final available = constraints.maxWidth - padding * 2;
               final columnWidth = available >= 3 * 280 + 2 * spacing
                   ? (available - 2 * spacing) / 3
                   : (available - spacing).clamp(280.0, 560.0);
 
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(padding),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final status in TaskStatus.values)
-                      Padding(
-                        padding: const EdgeInsets.only(right: spacing),
-                        child: TaskColumn(
-                          title: status.label,
-                          width: columnWidth,
-                          tasks: tasks.where((t) => t.status == status).toList(),
-                          writer: _writer,
+              final done = tasks
+                  .where((t) => t.status == TaskStatus.done)
+                  .length;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'THE BIG PICTURE',
+                          style: TextStyle(
+                            color: Color(0xFFB7A0FF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
                         ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Small steps. Real progress.',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${tasks.length} tasks • $done completed • ${widget.board.members.length} members',
+                          style: const TextStyle(color: Color(0xFFAAAFC5)),
+                        ),
+                        const SizedBox(height: 18),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: tasks.isEmpty ? 0 : done / tasks.length,
+                            minHeight: 5,
+                            color: const Color(0xFF71DEBB),
+                            backgroundColor: const Color(0xFF2B3043),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.all(padding),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final status in TaskStatus.values)
+                            Padding(
+                              padding: const EdgeInsets.only(right: spacing),
+                              child: TaskColumn(
+                                title: status.label,
+                                status: status,
+                                width: columnWidth,
+                                tasks: tasks
+                                    .where((t) => t.status == status)
+                                    .toList(),
+                                writer: _writer,
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               );
             },
           );
@@ -117,6 +189,7 @@ class _BoardScreenState extends State<BoardScreen> {
     );
   }
 }
+
 /// dialog for entering new task title , text controller disposed of when dialog closed
 class _AddTaskDialog extends StatefulWidget {
   const _AddTaskDialog();
@@ -149,7 +222,10 @@ class _AddTaskDialogState extends State<_AddTaskDialog> {
         onSubmitted: (_) => _submit(),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
         FilledButton(onPressed: _submit, child: const Text('Add')),
       ],
     );
