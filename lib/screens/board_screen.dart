@@ -5,6 +5,8 @@ import '../models/task.dart';
 import '../services/auth_service.dart';
 import '../services/board_service.dart';
 import '../services/write_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/theme_toggle_button.dart';
 import '../widgets/task_column.dart';
 
 ///three columns of tasks that update live for every member.
@@ -71,6 +73,8 @@ class _BoardScreenState extends State<BoardScreen> {
           ],
         ),
         actions: [
+          const ThemeToggleButton(),
+          const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 24),
             child: FilledButton.icon(
@@ -99,6 +103,7 @@ class _BoardScreenState extends State<BoardScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final tasks = snap.data!;
+          final colors = context.appColors;
 
           /// ostream, split three ways in Dart. On a wide screen the three columns , share the width, phone has own styling parameters as well
           return LayoutBuilder(
@@ -121,10 +126,10 @@ class _BoardScreenState extends State<BoardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'THE BIG PICTURE',
                           style: TextStyle(
-                            color: Color(0xFFB7A0FF),
+                            color: colors.brand,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 2,
@@ -141,7 +146,7 @@ class _BoardScreenState extends State<BoardScreen> {
                         const SizedBox(height: 8),
                         Text(
                           '${tasks.length} tasks • $done completed • ${widget.board.members.length} members',
-                          style: const TextStyle(color: Color(0xFFAAAFC5)),
+                          style: TextStyle(color: colors.muted),
                         ),
                         const SizedBox(height: 18),
                         ClipRRect(
@@ -149,8 +154,8 @@ class _BoardScreenState extends State<BoardScreen> {
                           child: LinearProgressIndicator(
                             value: tasks.isEmpty ? 0 : done / tasks.length,
                             minHeight: 5,
-                            color: const Color(0xFF71DEBB),
-                            backgroundColor: const Color(0xFF2B3043),
+                            color: colors.done,
+                            backgroundColor: colors.progressTrack,
                           ),
                         ),
                       ],

@@ -5,6 +5,8 @@ import '../models/board.dart';
 import '../services/auth_service.dart';
 import '../services/board_service.dart';
 import '../services/write_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/theme_toggle_button.dart';
 import 'board_screen.dart';
 
 /// lists users board, create and join button at bottom
@@ -162,18 +164,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 80,
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.space_dashboard_rounded, color: Color(0xFFB7A0FF)),
-            SizedBox(width: 12),
-            Text('TaskBoard'),
+            Icon(Icons.space_dashboard_rounded, color: colors.brand),
+            const SizedBox(width: 12),
+            const Text('TaskBoard'),
           ],
         ),
         actions: [
+          const ThemeToggleButton(),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -198,19 +202,19 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           final boards = snap.data!;
           if (boards.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.dashboard_customize_outlined,
                       size: 64,
-                      color: Color(0xFFB7A0FF),
+                      color: colors.brand,
                     ),
-                    SizedBox(height: 24),
-                    Text(
+                    const SizedBox(height: 24),
+                    const Text(
                       'Your next big thing starts here.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -218,11 +222,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
                       'Create a board for your team, or join one with a code.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFFAAAFC5)),
+                      style: TextStyle(color: colors.muted),
                     ),
                   ],
                 ),
@@ -243,21 +247,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFB7A0FF).withValues(alpha: .12),
+                      color: colors.brand.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.dashboard_outlined,
-                      color: Color(0xFFB7A0FF),
+                      color: colors.brand,
                     ),
                   ),
                   title: Text(board.name),
                   subtitle: Text(
                     '${board.members.length} members • Code: ${board.code}',
                   ),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.arrow_forward_rounded,
-                    color: Color(0xFFB7A0FF),
+                    color: colors.brand,
                   ),
                   onTap: () => _openBoard(board),
                 ),

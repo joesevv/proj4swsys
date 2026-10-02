@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/task.dart';
 import '../services/write_service.dart';
+import '../theme/app_theme.dart';
 
 /// show exactly one of: a Start button (todo), a Done button
 /// (in progress and started by me), or nothing. The card never updates itself;
@@ -42,9 +43,9 @@ class TaskCard extends StatelessWidget {
   }
 
   Future<void> _run(
-    BuildContext context,
-    Future<void> Function() action,
-  ) async {
+      BuildContext context,
+      Future<void> Function() action,
+      ) async {
     /// if another member's change moves this card first, the card is gone by the time the error arrives, but the message must still show.
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -56,6 +57,7 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final subtitle = switch (task.status) {
       TaskStatus.todo => 'Added by ${task.createdByName}',
       TaskStatus.inprogress => 'Started by ${task.startedByName ?? '?'}',
@@ -82,7 +84,7 @@ class TaskCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFF34394D)),
+        side: BorderSide(color: colors.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -105,7 +107,7 @@ class TaskCard extends StatelessWidget {
                 IconButton(
                   tooltip: 'Delete task',
                   icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                  color: const Color(0xFFAAAFC5),
+                  color: colors.muted,
                   onPressed: () => _delete(context),
                 ),
               ],
@@ -113,18 +115,18 @@ class TaskCard extends StatelessWidget {
             const SizedBox(height: 20),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.person_outline_rounded,
                   size: 16,
-                  color: Color(0xFFAAAFC5),
+                  color: colors.muted,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFFAAAFC5),
+                      color: colors.muted,
                     ),
                   ),
                 ),
