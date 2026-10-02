@@ -115,8 +115,15 @@ class AppColors extends ThemeExtension<AppColors> {
 }
 
 /// shortcut: `context.appColors.brand`
+/// if the current theme has no AppColors (for example in widget tests that wrap a
+/// screen in a plain MaterialApp), it falls back to the matching built-in palette
+/// instead of crashing.
 extension AppColorsContext on BuildContext {
-  AppColors get appColors => Theme.of(this).extension<AppColors>()!;
+  AppColors get appColors {
+    final theme = Theme.of(this);
+    return theme.extension<AppColors>() ??
+        (theme.brightness == Brightness.dark ? AppColors.dark : AppColors.light);
+  }
 }
 
 /// the two full themes. dark matches what the app looked like before.
@@ -194,6 +201,9 @@ class ThemeModeScope extends InheritedNotifier<ValueNotifier<ThemeMode>> {
     required super.child,
   });
 
-  static ValueNotifier<ThemeMode> of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<ThemeModeScope>()!.notifier!;
+  static ValueNotifier<ThemeMode> of(BuildContext context) => maybeOf(context)!;
+
+  /// null when there is no ThemeModeScope above this widget (e.g. in widget tests).
+  static ValueNotifier<ThemeMode>? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ThemeModeScope>()?.notifier;
 }
