@@ -14,7 +14,8 @@ class WriteService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> get _boards => _db.collection('boards');
+  CollectionReference<Map<String, dynamic>> get _boards =>
+      _db.collection('boards');
 
   CollectionReference<Map<String, dynamic>> _tasks(String boardId) =>
       _boards.doc(boardId).collection('tasks');
@@ -25,7 +26,10 @@ class WriteService {
 
   static String newCode() {
     final random = Random.secure();
-    return List.generate(codeLength, (_) => codeAlphabet[random.nextInt(codeAlphabet.length)]).join();
+    return List.generate(
+      codeLength,
+      (_) => codeAlphabet[random.nextInt(codeAlphabet.length)],
+    ).join();
   }
 
   /// creates a board and returns its join code. code is also docs id
@@ -63,6 +67,7 @@ class WriteService {
       if (snap.exists) return code;
     } on FirebaseException catch (e) {
       if (e.code != 'permission-denied') throw _message(e);
+
       /// Not a member yet add ourselves.
     }
 
@@ -80,25 +85,22 @@ class WriteService {
     }
   }
 
-  Future<void> addTask(String boardId, String title) => _write(
-        () async {
-      await _tasks(boardId).add({
-        'title': title,
-        'status': 'todo',
-        'createdBy': {'uid': uid, 'name': name},
-        'createdAt': FieldValue.serverTimestamp(),
-        'startedBy': null,
-        'startedAt': null,
-        'doneAt': null,
-      });
-    },
-    whenDenied: 'You are not a member of this board.',
-  );
+  Future<void> addTask(String boardId, String title) => _write(() async {
+    await _tasks(boardId).add({
+      'title': title,
+      'status': 'todo',
+      'createdBy': {'uid': uid, 'name': name},
+      'createdAt': FieldValue.serverTimestamp(),
+      'startedBy': null,
+      'startedAt': null,
+      'doneAt': null,
+    });
+  }, whenDenied: 'You are not a member of this board.');
 
   /// todo -> inprogress  rules only allow this while the task is still 'todo',
   /// so if two people press Start together, the second one is refused.
   Future<void> startTask(String boardId, String taskId) => _write(
-        () => _tasks(boardId).doc(taskId).update({
+    () => _tasks(boardId).doc(taskId).update({
       'status': 'inprogress',
       'startedBy': {'uid': uid, 'name': name},
       'startedAt': FieldValue.serverTimestamp(),
@@ -108,14 +110,23 @@ class WriteService {
 
   /// inprogress -> done. The rules only allow this for the person who started it.
   Future<void> finishTask(String boardId, String taskId) => _write(
-        () => _tasks(boardId).doc(taskId).update({
-      'status': 'done',
-      'doneAt': FieldValue.serverTimestamp(),
-    }),
+    () =>
+        _tasks(boardId)
+            .doc(taskId)
+            .update({'status': 'done', 'doneAt': FieldValue.serverTimestamp()}),
     whenDenied: 'Only the person who started this task can finish it.',
   );
 
-  Future<void> _write(Future<void> Function() action, {required String whenDenied}) async {
+  /// Any current board member can remove a task in any status.
+  Future<void> deleteTask(String boardId, String taskId) => _write(
+    () => _tasks(boardId).doc(taskId).delete(),
+    whenDenied: 'Only board members can delete tasks.',
+  );
+
+  Future<void> _write(
+    Future<void> Function() action, {
+    required String whenDenied,
+  }) async {
     try {
       await action();
     } on FirebaseException catch (e) {

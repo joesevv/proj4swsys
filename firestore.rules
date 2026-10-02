@@ -91,7 +91,7 @@ service cloud.firestore {
         allow read: if isMember(boardId);
         allow create: if isMember(boardId) && validNewTask();
         allow update: if isMember(boardId) && (canStart() || canFinish());
-        allow delete: if false;
+        allow delete: if isMember(boardId);
       }
     }
   }

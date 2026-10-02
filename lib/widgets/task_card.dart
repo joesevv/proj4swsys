@@ -12,6 +12,35 @@ class TaskCard extends StatelessWidget {
   final Task task;
   final WriteService writer;
 
+  Future<void> _delete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete task?'),
+        content: Text(
+          '“${task.title}” will be permanently removed from this board.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await _run(context, () => writer.deleteTask(task.boardId, task.id));
+    }
+  }
+
   Future<void> _run(
     BuildContext context,
     Future<void> Function() action,
@@ -60,13 +89,26 @@ class TaskCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              task.title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Delete task',
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  color: const Color(0xFFAAAFC5),
+                  onPressed: () => _delete(context),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(
